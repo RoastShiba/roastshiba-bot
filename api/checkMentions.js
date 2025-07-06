@@ -1,10 +1,9 @@
 const { TwitterApi } = require("twitter-api-v2");
 const fetch = require("node-fetch");
-
-let lastTweetId = null; // In-memory cache — will reset on redeploy
+const { getLastTweetId, setLastTweetId } = require("../lib/sheets");
 
 module.exports = async function handler(req, res) {
-  console.log("🚀 RoastShiba /api/checkMentions triggered");
+  console.log("🚀 /api/checkMentions triggered");
 
   try {
     const twitter = new TwitterApi({
@@ -14,56 +13,51 @@ module.exports = async function handler(req, res) {
       accessSecret: process.env.ACCESS_SECRET
     });
 
-    // 🧠 Use /search to avoid rate-limited mentions API
+    // 🔍 Search for tweets tagging @RoastShiba
     const search = await twitter.v2.search("@RoastShiba", {
       "tweet.fields": "author_id,created_at",
       max_results: 10
     });
 
     const data = search.data;
-
     if (!data || data.length === 0) {
-      console.log("🟡 No tweets found.");
-      return res.status(200).json({ message: "No mentions found" });
+      console.log("🟡 No mentions found.");
+      return res.status(200).json({ message: "No mentions" });
     }
 
-    // 🧹 Filter out tweets already roasted (by comparing last ID)
-    const newMentions = data.filter(tweet => tweet.id !== lastTweetId);
+    const lastId = await getLastTweetId();
+    console.log("🧠 Last roasted ID:", lastId);
 
-    if (newMentions.length === 0) {
-      console.log("🟨 No new unprocessed mentions.");
-      return res.status(200).json({ message: "No new mentions to roast" });
+    const newMention = data.find(tweet => tweet.id !== lastId);
+    if (!newMention) {
+      console.log("🟨 No unroasted tweets.");
+      return res.status(200).json({ message: "No new tweets" });
     }
 
-    // 🔥 Process the latest unroasted tweet
-    const tweet = newMentions[0];
-    const tweetId = tweet.id;
-    const tweetText = tweet.text;
-    const username = tweet.author_id;
+    const tweetText = newMention.text;
+    const tweetId = newMention.id;
+    const username = newMention.author_id;
     const artTitle = tweetText.replace(/@RoastShiba/gi, "").trim();
     const tweetURL = `https://x.com/${username}/status/${tweetId}`;
 
-    console.log("🎯 Roasting tweet:", tweetId, tweetText);
+    console.log("🔥 Roasting tweet:", tweetId);
 
-    // ✅ Trigger roast endpoint
     await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/roast`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, artTitle, tweetId, tweetURL })
     });
 
-    // 🔒 Store the last tweet ID to avoid duplicate roasts
-    lastTweetId = tweetId;
-
+    await setLastTweetId(tweetId);
     return res.status(200).json({ roasted: tweetId });
 
   } catch (err) {
     if (err.code === 429) {
-      console.warn("⚠️ Twitter API rate limit hit. Skipping roast.");
-      return res.status(429).json({ error: "Rate limit. Try later." });
+      console.warn("⚠️ Rate limit hit.");
+      return res.status(429).json({ error: "Rate limit hit." });
     }
 
-    console.error("❌ checkMentions fatal error:", err);
+    console.error("❌ checkMentions failed:", err);
     return res.status(500).json({ error: "Server error" });
   }
 };
