@@ -13,10 +13,11 @@ module.exports = async function handler(req, res) {
     });
 
     // ✅ Use search instead of userMentionTimeline (avoids rate limit)
-    const response = await twitter.v2.search("@RoastShiba", {
-      "tweet.fields": "author_id",
-      max_results: 5
-    });
+  const response = await twitter.v2.search("@RoastShiba", {
+  "tweet.fields": "author_id",
+  max_results: 10
+});
+
 
     const data = response.data;
 
