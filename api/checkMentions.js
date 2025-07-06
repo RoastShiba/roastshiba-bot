@@ -12,16 +12,18 @@ module.exports = async function handler(req, res) {
       accessSecret: process.env.ACCESS_SECRET
     });
 
-    const me = await twitter.v2.me();
-    const botId = me.data.id;
-    console.log("🤖 Bot ID:", botId);
-
-    const { data } = await twitter.v2.userMentionTimeline(botId, {
-      expansions: ["author_id"],
+    // ✅ Use search instead of userMentionTimeline (avoids rate limit)
+    const response = await twitter.v2.search("@RoastShiba", {
+      "tweet.fields": "author_id",
       max_results: 5
     });
 
-    if (!data || data.length === 0) return res.status(200).send("No mentions found");
+    const data = response.data;
+
+    if (!data || data.length === 0) {
+      console.log("😶 No new mentions found");
+      return res.status(200).send("No mentions found");
+    }
 
     const latest = data[0];
     const tweetText = latest.text;
@@ -30,15 +32,18 @@ module.exports = async function handler(req, res) {
     const artTitle = tweetText.replace(/@RoastShiba/gi, "").trim();
     const tweetURL = `https://x.com/${username}/status/${tweetId}`;
 
+    console.log("🔥 Processing roast for:", { username, artTitle });
+
+    // ✅ Call roast endpoint
     await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/roast`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, artTitle, tweetId, tweetURL })
     });
 
-    res.status(200).json({ handled: tweetId });
+    return res.status(200).json({ handled: tweetId });
   } catch (err) {
     console.error("❌ Error in checkMentions:", err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 };
