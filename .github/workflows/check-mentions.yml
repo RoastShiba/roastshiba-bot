@@ -1,0 +1,12 @@
+name: Ping RoastShiba Bot
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # Every 10 minutes UTC
+
+jobs:
+  roast-ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/checkMentions
+        run: curl -s -X GET https://roastshiba-bot.vercel.app//api/checkMentions
