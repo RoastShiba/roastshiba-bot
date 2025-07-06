@@ -9,4 +9,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping /api/checkMentions
-        run: curl -s -X GET https://roastshiba-bot.vercel.app//api/checkMentions
+        run: curl -s -X GET https://roastshiba-bot.vercel.app/api/checkMentions

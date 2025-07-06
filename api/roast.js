@@ -1,8 +1,8 @@
-// Vercel API route: Receives data → generates roast → saves to sheet → replies on Twitter
-import { writeToSheet } from "@/lib/sheets";
-import { TwitterApi } from "twitter-api-v2";
+const fetch = require("node-fetch");
+const { TwitterApi } = require("twitter-api-v2");
+const { writeToSheet } = require("../lib/sheets");
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const { username, artTitle, tweetId, tweetURL } = req.body;
 
   const roastPrompt = `
@@ -10,7 +10,6 @@ Roast this artwork titled "${artTitle}" by @${username}.
 Make it sarcastic, funny, and under 280 characters.
 `;
 
-  // === Claude API request (replace with OpenAI if needed) ===
   const roastResponse = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -26,16 +25,14 @@ Make it sarcastic, funny, and under 280 characters.
 
   const roast = roastResponse?.content?.[0]?.text || "Roast failed";
 
-  // === Save to Google Sheets ===
   await writeToSheet({
     username,
     artTitle,
     roast,
-    score: Math.floor(Math.random() * 10) + 1, // placeholder score
+    score: Math.floor(Math.random() * 10) + 1,
     tweetURL
   });
 
-  // === Reply on Twitter ===
   const twitter = new TwitterApi({
     appKey: process.env.API_KEY,
     appSecret: process.env.API_SECRET,
@@ -46,4 +43,4 @@ Make it sarcastic, funny, and under 280 characters.
   await twitter.v2.reply(`@${username} ${roast}`, tweetId);
 
   res.status(200).json({ success: true, roast });
-}
+};

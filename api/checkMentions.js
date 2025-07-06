@@ -1,38 +1,44 @@
-// Periodically check for new mentions
-import { TwitterApi } from "twitter-api-v2";
+const { TwitterApi } = require("twitter-api-v2");
+const fetch = require("node-fetch");
 
-export default async function handler(req, res) {
-  const twitter = new TwitterApi({
-    appKey: process.env.API_KEY,
-    appSecret: process.env.API_SECRET,
-    accessToken: process.env.ACCESS_TOKEN,
-    accessSecret: process.env.ACCESS_SECRET
-  });
+module.exports = async function handler(req, res) {
+  try {
+    console.log("✅ checkMentions triggered");
 
-  const me = await twitter.v2.me();
-  const botId = me.data.id;
+    const twitter = new TwitterApi({
+      appKey: process.env.API_KEY,
+      appSecret: process.env.API_SECRET,
+      accessToken: process.env.ACCESS_TOKEN,
+      accessSecret: process.env.ACCESS_SECRET
+    });
 
-  const { data } = await twitter.v2.userMentionTimeline(botId, {
-    expansions: ["author_id"],
-    max_results: 5
-  });
+    const me = await twitter.v2.me();
+    const botId = me.data.id;
+    console.log("🤖 Bot ID:", botId);
 
-  if (!data || data.length === 0) return res.status(200).send("No mentions found");
+    const { data } = await twitter.v2.userMentionTimeline(botId, {
+      expansions: ["author_id"],
+      max_results: 5
+    });
 
-  const latest = data[0];
-  const tweetText = latest.text;
-  const tweetId = latest.id;
-  const username = latest.author_id;
+    if (!data || data.length === 0) return res.status(200).send("No mentions found");
 
-  const artTitle = tweetText.replace(/@RoastShiba/gi, "").trim();
-  const tweetURL = `https://x.com/${username}/status/${tweetId}`;
+    const latest = data[0];
+    const tweetText = latest.text;
+    const tweetId = latest.id;
+    const username = latest.author_id;
+    const artTitle = tweetText.replace(/@RoastShiba/gi, "").trim();
+    const tweetURL = `https://x.com/${username}/status/${tweetId}`;
 
-  // Call roast API
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/roast`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, artTitle, tweetId, tweetURL })
-  });
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/roast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, artTitle, tweetId, tweetURL })
+    });
 
-  res.status(200).json({ handled: tweetId });
-}
+    res.status(200).json({ handled: tweetId });
+  } catch (err) {
+    console.error("❌ Error in checkMentions:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
